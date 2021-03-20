@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { v4 as uuidv4 } from 'uuid';
 
 let users = {
   1: {
@@ -27,8 +28,14 @@ let messages = {
 };
 
 const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(cors())
+app.use(cors());
+
+app.use((req, res, next) => {
+  next()
+})
 
 app.get('/users', (req, res) => {
   return res.send(Object.values(users));
@@ -37,12 +44,25 @@ app.get('/users', (req, res) => {
 app.get('/users/:userId', (req, res) => {
   return res.send(users[req.params.userId]);
 });
+
 app.post('/users', (req, res) => {
   return res.send('POST HTTP method on user resource');
 });
 
 app.get('/messages', (req, res) => {
   return res.send(Object.values(messages));
+});
+
+app.post('/messages', (req, res) => {
+  const id = uuidv4();
+  const message = {
+    id,
+    text: req.body.text,
+  };
+
+  messages[id] = message;
+
+  return res.send(message);
 });
 
 app.get('/messages/:messageId', (req, res) => {
