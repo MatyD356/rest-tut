@@ -34,6 +34,32 @@ app.use('/session', routes.session);
 app.use('/users', routes.user);
 app.use('/messages', routes.message);
 
+app.get('*', function (req, res, next) {
+  const error = new Error(
+    `${req.ip} tried to access ${req.originalUrl}`,
+  );
+
+  error.statusCode = 301;
+
+  next(error);
+});
+
+app.use((error, req, res, next) => {
+  if (!error.statusCode) error.statusCode = 500;
+
+  if (error.statusCode === 301) {
+    return res.status(301).redirect('/not-found');
+  }
+
+  return res
+    .status(error.statusCode)
+    .json({ error: error.toString() });
+});
+
+app.use((error, req, res, next) => {
+  return res.status(500).json({ error: error.toString() });
+});
+
 // * Start * //
 
 const eraseDatabaseOnSync = true;
