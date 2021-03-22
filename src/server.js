@@ -1,66 +1,86 @@
 import 'dotenv/config';
-import express from 'express';
 import cors from 'cors';
-import { v4 as uuidv4 } from 'uuid';
-import models from './models';
+import express from 'express';
 
+import models, { connectDb } from './models';
+import routes from './routes';
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// * Application-Level Middleware * //
+
+// Third-Party Middleware
 
 app.use(cors());
 
-app.use((req, res, next) => {
+// Built-In Middleware
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Custom Middleware
+
+app.use(async (req, res, next) => {
   req.context = {
     models,
-    me: models.users[1],
+    me: await models.User.findByLogin('rwieruch'),
   };
-})
-
-app.get('/session', (req, res) => {
-  return res.send(req.context.models.users[req.context.me.id]);
+  next();
 });
 
-app.get('/users', (req, res) => {
-  return res.send(Object.values(req.context.models.users));
+// * Routes * //
+
+app.use('/session', routes.session);
+app.use('/users', routes.user);
+app.use('/messages', routes.message);
+
+// * Start * //
+
+const eraseDatabaseOnSync = true;
+
+connectDb().then(async () => {
+  if (eraseDatabaseOnSync) {
+    await Promise.all([
+      models.User.deleteMany({}),
+      models.Message.deleteMany({}),
+    ]);
+
+    createUsersWithMessages();
+  }
+
+  app.listen(process.env.PORT, () =>
+    console.log(`Example app listening on port ${process.env.PORT}!`),
+  );
 });
 
-app.get('/users/:userId', (req, res) => {
-  return res.send(req.context.models.users[req.params.userId]);
-});
+const createUsersWithMessages = async () => {
+  const user1 = new models.User({
+    username: 'rwieruch',
+  });
 
-app.get('/messages', (req, res) => {
-  return res.send(Object.values(req.context.models.messages));
-});
+  const user2 = new models.User({
+    username: 'ddavids',
+  });
 
-app.get('/messages/:messageId', (req, res) => {
-  return res.send(req.context.models.messages[req.params.messageId]);
-});
+  const message1 = new models.Message({
+    text: 'Published the Road to learn React',
+    user: user1.id,
+  });
 
-app.post('/messages', (req, res) => {
-  const id = uuidv4();
-  const message = {
-    id,
-    text: req.body.text,
-    userId: req.context.me.id,
-  };
+  const message2 = new models.Message({
+    text: 'Happy to release ...',
+    user: user2.id,
+  });
 
-  req.context.models.messages[id] = message;
+  const message3 = new models.Message({
+    text: 'Published a complete ...',
+    user: user2.id,
+  });
 
-  return res.send(message);
-});
+  await message1.save();
+  await message2.save();
+  await message3.save();
 
-app.delete('/messages/:messageId', (req, res) => {
-  const {
-    [req.params.messageId]: message,
-    ...otherMessages
-  } = req.context.models.messages;
-
-  req.context.models.messages = otherMessages;
-
-  return res.send(message);
-});
-app.listen(process.env.PORT, () => {
-  console.log(`app listening on port ${process.env.PORT}!`);
-})
+  await user1.save();
+  await user2.save();
+};

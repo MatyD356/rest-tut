@@ -6,4 +6,4 @@ export default {
   session,
   user,
   message,
-}
+};
